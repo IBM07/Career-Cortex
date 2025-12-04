@@ -1,13 +1,27 @@
-ollama
-requests 
-beautifulsoup4 
-mysql-connector-python 
-click
+# Web Scraping
 selenium
-ollama
+beautifulsoup4
+
+# Database
+mysql-connector-python
+
+# API Framework
 flask
-streamlit
 flask-cors
-pandas 
+
+# Frontend
+streamlit
+
+# AI/LLM
+ollama
+
+# Data Processing
+pandas
 plotly
+
+# PDF Processing
 PyPDF2
+
+# Utilities
+requests
+click

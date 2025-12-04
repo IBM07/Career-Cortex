@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import os
-import PyPDF2  # You need to install this: pip install PyPDF2
+from resume_parser import parse_resume  # Import our new module
 
 # --- 1. Configuration & Cloud Readiness ---
 # GCP requires dynamic configuration. We read from Environment Variables.
@@ -9,7 +9,7 @@ import PyPDF2  # You need to install this: pip install PyPDF2
 API_BASE_URL = os.getenv("API_URL", "http://127.0.0.1:5000")
 
 # --- 2. Caching & API Logic ---
-@st.cache_data(ttl=60) # Cache for 1 minute to prevent spamming
+@st.cache_data(ttl=60)  # Cache for 1 minute to prevent spamming
 def fetch_jobs_from_api(skills_query):
     try:
         # Construct endpoint using the dynamic base URL
@@ -23,17 +23,6 @@ def fetch_jobs_from_api(skills_query):
     except requests.exceptions.RequestException as e:
         return {"error": str(e)}
 
-def extract_text_from_pdf(pdf_file):
-    """Helper feature to read resumes"""
-    try:
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-        return text
-    except Exception:
-        return ""
-
 # --- 3. Page Config ---
 st.set_page_config(
     page_title="CareerCortex | AI Job Agent",
@@ -46,139 +35,225 @@ st.set_page_config(
 if 'skills_input' not in st.session_state:
     st.session_state.skills_input = "python, docker, fastapi"
 
+if 'last_upload_time' not in st.session_state:
+    st.session_state.last_upload_time = None
+
 # --- 5. The UI ---
 st.title("🚀 CareerCortex")
 st.markdown("### The AI Agent that reads your resume and finds your job.")
 
-# --- FEATURE: Resume Uploader ---
-with st.expander("📄 Upload Resume (Optional) - Let AI extract your skills", expanded=True):
-    uploaded_file = st.file_uploader("Upload PDF Resume", type="pdf")
+# --- FEATURE: AI-Powered Resume Uploader ---
+with st.expander("📄 Upload Resume - AI will extract your skills automatically", expanded=True):
+    st.markdown("""
+    **How it works:**
+    1. Upload your PDF resume
+    2. Local AI (Ollama) analyzes the content
+    3. Skills are automatically extracted and populated
+    """)
+    
+    uploaded_file = st.file_uploader(
+        "Upload PDF Resume", 
+        type="pdf",
+        help="Upload your resume and let AI extract your technical skills"
+    )
+    
     if uploaded_file:
-        resume_text = extract_text_from_pdf(uploaded_file)
-        if resume_text:
-            # Simple keyword extraction simulation
-            # In a real interview, you'd mention you could use an LLM here
-            found_skills = []
-            common_tech = [
-    # Core Languages
-    "python", "java", "c++", "go", "golang", "rust", "javascript", "typescript", "node.js",
-    
-    # Data Structures & Algorithms
-    "arrays", "linked lists", "binary trees", "avl trees", "b-trees", "graphs", 
-    "bfs", "dfs", "hash maps", "heaps", "sorting algorithms", "searching algorithms", "big o notation",
-    
-    # Object-Oriented Programming & Design
-    "inheritance", "polymorphism", "encapsulation", "abstraction", "solid principles",
-    "singleton pattern", "factory pattern", "observer pattern", "strategy pattern", 
-    "decorator pattern", "adapter pattern", "dependency injection",
-    
-    # Backend Frameworks
-    "django", "flask", "fastapi", "tornado", "sanic",
-    
-    # API Standards & Protocols
-    "restful apis", "hateoas", "graphql", "grpc", "protocol buffers", "websockets",
-    
-    # ORM & Data Validation
-    "sqlalchemy", "django orm", "pydantic", "alembic",
-    
-    # Databases (Relational & NoSQL)
-    "postgresql", "mysql", "mariadb", "sqlite", 
-    "mongodb", "cassandra", "scylladb", "dynamodb", "neo4j",
-    
-    # Caching & Search
-    "redis", "memcached", "elasticsearch", "solr", "meilisearch",
-    
-    # Async & Task Queues
-    "celery", "redis queue", "dramatiq", "asyncio",
-    
-    # Web Servers
-    "gunicorn", "uvicorn", "hypercorn", "wsgi", "asgi",
-    
-    # System Architecture
-    "monolithic architecture", "microservices", "event-driven architecture", "serverless", "soa",
-    "horizontal scaling", "vertical scaling", "load balancing", "nginx", "haproxy", "aws alb", 
-    "sharding", "consistent hashing", "cap theorem", "distributed systems", 
-    "consensus algorithms", "raft", "paxos", "distributed locking", "idempotency", 
-    "event sourcing", "cqrs",
-    
-    # Infrastructure & DevOps
-    "docker", "containerd", "kubernetes", "helm charts", "terraform", "ansible", "pulumi", "cloudformation",
-    
-    # Cloud Platforms (AWS/GCP/Azure)
-    "aws", "gcp", "azure", "ec2", "lambda", "eks", "ecs", "s3", "ebs", "glacier", 
-    "vpc", "route53", "cloudfront",
-    
-    # CI/CD
-    "github actions", "gitlab ci", "jenkins", "circleci", "argocd",
-    
-    # Testing
-    "pytest", "unittest", "selenium", "playwright", "postman", "newman", "mocking",
-    
-    # Tools & Observability
-    "git", "gitflow", "bash scripting", "zsh", "grep", "sed", "awk", "ssh", "curl", 
-    "prometheus", "grafana", "elk stack", "jaeger", "zipkin", "sentry",
-    
-    # Security
-    "owasp top 10", "oauth2", "jwt", "openid connect", "tls/ssl",
-    
-    # Data Engineering & AI Integration
-    "apache kafka", "rabbitmq", "airflow", "spark", "etl pipelines",
-    "langchain", "vector databases", "pinecone", "milvus", "openai api", "huggingface transformers"
-]
+        # Show processing status
+        with st.spinner("🤖 AI is analyzing your resume..."):
+            # Parse resume using Ollama
+            success, extracted_skills, message = parse_resume(
+                uploaded_file, 
+                use_ollama=True,  # Set to False to skip Ollama and use fallback
+                ollama_model='qwen2.5:14b'
+            )
+        
+        if success:
+            # Update the session state with extracted skills
+            st.session_state.skills_input = ", ".join(extracted_skills)
             
-            for tech in common_tech:
-                if tech in resume_text.lower():
-                    found_skills.append(tech)
+            # Show success message with skill preview
+            st.success(message)
             
-            if found_skills:
-                # Update the session state to auto-fill the input box
-                st.session_state.skills_input = ", ".join(found_skills)
-                st.success(f"✅ Extracted {len(found_skills)} skills from your resume!")
-            else:
-                st.warning("Could not identify specific tech skills, but file loaded.")
+            # Display extracted skills in an organized way
+            with st.container():
+                st.markdown("**Extracted Skills:**")
+                
+                # Display skills in columns for better readability
+                cols = st.columns(3)
+                for idx, skill in enumerate(extracted_skills):
+                    with cols[idx % 3]:
+                        st.markdown(f"✓ `{skill}`")
+                
+                st.info("💡 Skills have been automatically added below. You can edit them if needed.")
+        else:
+            st.error(message)
+            st.info("💡 **Troubleshooting:**")
+            st.markdown("""
+            - Ensure Ollama is running: `ollama serve`
+            - Check if qwen2.5:14b model is installed: `ollama list`
+            - If model is missing: `ollama pull qwen2.5:14b`
+            - The system will use keyword matching as fallback if Ollama is unavailable
+            """)
 
 # --- Main Search Input ---
 # We bind the value to session_state so the resume uploader can update it
+st.markdown("---")
+st.markdown("### 🔍 Search Jobs")
+
 user_skills = st.text_input(
-    "Your Skills",
-    key="skills_input", # This links the input to our variable
-    help="Enter skills comma-separated, or upload resume above."
+    "Your Skills (comma-separated)",
+    key="skills_input",  # This links the input to our variable
+    help="Enter skills comma-separated, or upload resume above for automatic extraction",
+    placeholder="e.g., Python, React, AWS, Docker"
 )
 
-if st.button("Find My Match", type="primary"):
+col1, col2 = st.columns([3, 1])
+with col1:
+    search_button = st.button("🎯 Find My Perfect Match", type="primary", use_container_width=True)
+with col2:
+    if st.button("🔄 Reset", use_container_width=True):
+        st.session_state.skills_input = ""
+        st.rerun()
+
+if search_button:
     if not user_skills:
-        st.error("Please enter skills or upload a resume.")
+        st.error("⚠️ Please enter skills or upload a resume.")
     else:
-        with st.spinner(f"Connecting to AI Agent at {API_BASE_URL}..."):
+        with st.spinner(f"🔍 Searching jobs at {API_BASE_URL}..."):
             data = fetch_jobs_from_api(user_skills)
 
         if "error" in data:
             st.error(f"❌ Connection Failed: {data['error']}")
-            st.info("💡 If running locally, ensure backend is on port 5000.")
-            st.info("💡 If on GCP, ensure API_URL environment variable is set.")
+            st.info("💡 **Troubleshooting:**")
+            st.markdown("""
+            - **Running Locally:** Ensure Flask API is running on port 5000
+            - **Running on GCP:** Ensure API_URL environment variable is set correctly
+            - **Database:** Check if MySQL is running and accessible
+            """)
         else:
             # Handle Pagination Structure
             total_count = data.get('pagination', {}).get('total_jobs', 0)
             jobs = data.get('jobs', [])
 
             if not jobs:
-                st.warning("No jobs found. Try broader keywords.")
+                st.warning("😔 No jobs found. Try these tips:")
+                st.markdown("""
+                - Use broader keywords (e.g., "Python" instead of "Python Django FastAPI")
+                - Try single skills one at a time
+                - Check if jobs exist in the database
+                """)
             else:
-                st.success(f"🎯 Found {total_count} perfect matches based on your profile.")
+                st.success(f"🎯 Found {total_count} perfect matches based on your profile!")
+                st.markdown(f"*Showing top results sorted by match score*")
                 
-                # Display Grid
-                for job in jobs:
+                # Display Job Cards
+                for idx, job in enumerate(jobs, 1):
                     with st.container(border=True):
-                        c1, c2 = st.columns([3, 1])
-                        with c1:
-                            st.subheader(job['title'])
-                            st.caption(f"{job['company']} | {job['location']} | {'Remote 🌍' if job.get('is_remote') else 'On-site 🏢'}")
-                            if job.get('skills_missing'):
-                                st.markdown(f"⚠️ **Missing:** `{', '.join(job['skills_missing'][:5])}`")
-                        with c2:
-                            st.metric("Match Score", job['match_score'])
-                            st.link_button("Apply Now", job.get('apply_url', '#'))
+                        # Header Row
+                        col_title, col_score = st.columns([3, 1])
+                        
+                        with col_title:
+                            st.subheader(f"{idx}. {job['title']}")
+                            
+                            # Company and Location Info
+                            location_emoji = '🌍' if job.get('is_remote') else '🏢'
+                            st.caption(f"**{job['company']}** | {job['location']} {location_emoji}")
+                            
+                            # Job Type Badge
+                            job_type = job.get('job_type', 'Not specified')
+                            st.markdown(f"*{job_type}*")
+                        
+                        with col_score:
+                            # Match Score Display
+                            match_score = job.get('match_score_int', 0)
+                            
+                            # Color coding for match scores
+                            if match_score >= 80:
+                                score_color = "🟢"
+                            elif match_score >= 50:
+                                score_color = "🟡"
+                            else:
+                                score_color = "🔴"
+                            
+                            st.metric(
+                                "Match", 
+                                f"{match_score}%",
+                                help="Percentage of required skills you possess"
+                            )
+                            st.markdown(f"{score_color}")
+                        
+                        # Missing Skills Section
+                        missing_skills = job.get('skills_missing', [])
+                        if missing_skills:
+                            with st.expander(f"⚠️ Missing Skills ({len(missing_skills)})"):
+                                st.markdown("Skills to learn for this role:")
+                                for skill in missing_skills[:10]:  # Show max 10
+                                    st.markdown(f"- `{skill}`")
+                        
+                        # Action Buttons
+                        col_btn1, col_btn2, col_btn3 = st.columns([2, 2, 2])
+                        
+                        with col_btn1:
+                            apply_url = job.get('apply_url', '#')
+                            st.link_button("📝 Apply Now", apply_url, use_container_width=True)
+                        
+                        with col_btn2:
+                            # Copy job details
+                            job_summary = f"{job['title']} at {job['company']} - {match_score}% match"
+                            if st.button(f"📋 Copy Details", key=f"copy_{job['id']}", use_container_width=True):
+                                st.toast("Copied to clipboard!", icon="✅")
+                        
+                        with col_btn3:
+                            # Posted date
+                            posted_date = job.get('posted_date', 'Unknown')
+                            st.caption(f"📅 Posted: {posted_date[:10]}")
 
-# --- Footer for Interview Credit ---
+# --- Footer ---
 st.markdown("---")
-st.caption("Powered by Custom Python Scraper, Flask API, and Streamlit Frontend.")
+st.markdown("""
+<div style='text-align: center; color: #666;'>
+    <p><strong>CareerCortex</strong> - Powered by Custom Web Scraping, Flask API, Ollama AI & Streamlit</p>
+    <p>Built with ❤️ for smarter job searching</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Sidebar with app info
+with st.sidebar:
+    st.title("ℹ️ About")
+    st.markdown("""
+    **CareerCortex** uses:
+    - 🕷️ Custom web scrapers (Remote.com, Wellfound, YC)
+    - 🧠 Ollama AI for resume parsing
+    - 🔍 Smart skill matching algorithm
+    - ⚡ Flask REST API backend
+    - 💾 MySQL database
+    
+    **Tech Stack:**
+    - Python, Selenium, BeautifulSoup
+    - Flask, MySQL, Streamlit
+    - Ollama (qwen2.5:14b)
+    """)
+    
+    st.markdown("---")
+    st.markdown("### 🛠️ System Status")
+    
+    # Quick health check
+    try:
+        response = requests.get(f"{API_BASE_URL}/jobs/stats", timeout=3)
+        if response.status_code == 200:
+            stats = response.json()
+            st.success("✅ API Connected")
+            st.metric("Total Jobs", stats.get('total_jobs', 0))
+            st.metric("Remote Jobs", stats.get('remote_jobs', 0))
+        else:
+            st.error("❌ API Error")
+    except:
+        st.warning("⚠️ API Offline")
+    
+    # Check Ollama status
+    try:
+        import ollama
+        ollama.list()
+        st.success("✅ Ollama Running")
+    except:
+        st.warning("⚠️ Ollama Offline")

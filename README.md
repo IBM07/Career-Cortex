@@ -4,7 +4,7 @@ An intelligent job matching system that scrapes job listings, extracts structure
 
 🚀 What It Does
 
-HireWire transforms the job search process by:
+Career Cortex transforms the job search process by:
 
 - Scraping job listings automatically from remote.com
 - Extracting structured data (company, location, skills, seniority) from messy job descriptions using AI
@@ -322,4 +322,5 @@ Ibrahim
 If you find this project helpful, please give it a ⭐️!
 
 Currently building the Streamlit frontend - follow for updates!
+
 

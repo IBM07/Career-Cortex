@@ -1,4 +1,4 @@
-🎯 HireWire - AI-Powered Job Intelligence System
+🎯 Career Cortex - AI-Powered Job Intelligence System
 
 An intelligent job matching system that scrapes job listings, extracts structured data using AI, and matches candidates with opportunities based on their skills.
 
@@ -322,3 +322,4 @@ Ibrahim
 If you find this project helpful, please give it a ⭐️!
 
 Currently building the Streamlit frontend - follow for updates!
+
